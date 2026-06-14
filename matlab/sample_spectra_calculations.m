@@ -1,11 +1,15 @@
 % Spectral Analysis applied to georectified sample wave image stack
 
-addpath _data/
-addpath _functions/
+% Resolve paths relative to this script: _functions/ alongside it, _data/
+% one level up at the repo root
+script_dir = fileparts(mfilename('fullpath'));
+data_dir = fullfile(script_dir, '..', '_data');
+addpath(fullfile(script_dir, '_functions'))
+addpath(data_dir)
 
-load _data/angle_stack_x.mat
-load _data/angle_stack_y.mat
-load _data/freeboard.mat
+load(fullfile(data_dir, 'angle_stack_x.mat'))
+load(fullfile(data_dir, 'angle_stack_y.mat'))
+load(fullfile(data_dir, 'freeboard.mat'))
 
 slopefield_stack_x = tand(double(ax_int)*1e-3);
 slopefield_stack_y = tand(double(ay_int)*1e-3);

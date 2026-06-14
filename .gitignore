@@ -1,0 +1,16 @@
+# Generated data products and figures
+_data/asit2019_slope_stack_ds8.nc
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.claude/
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/

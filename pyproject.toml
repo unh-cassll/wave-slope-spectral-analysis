@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slopespectra"
+version = "0.1.0"
+description = "Fourier analysis of ocean wave slope fields: wavenumber-frequency directional spectra and associated products"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+authors = [
+    { name = "Nathan J. M. Laxague" },
+]
+keywords = [
+    "ocean waves",
+    "wave slope",
+    "directional wave spectrum",
+    "wavenumber-frequency spectrum",
+    "polarimetric slope sensing",
+    "remote sensing",
+    "air-sea interaction",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Oceanography",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "xarray>=2023.1",
+    "matplotlib>=3.7",
+    "seaborn>=0.13",
+]
+
+[project.optional-dependencies]
+# Reading NetCDF slope-field records (E-PSS pipeline products)
+netcdf = [
+    "netCDF4>=1.6",
+]
+# Reading the bundled MATLAB v7.3 sample data (_data/*.mat)
+sample-data = [
+    "h5py>=3.0",
+]
+test = [
+    "pytest>=7.0",
+    "h5py>=3.0",
+    "netCDF4>=1.6",
+]
+all = [
+    "slopespectra[netcdf,sample-data,test]",
+]
+
+[project.urls]
+Homepage      = "https://github.com/unh-cassll/wave-slope-spectral-analysis"
+"Source code" = "https://github.com/unh-cassll/wave-slope-spectral-analysis"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["slopespectra*"]
+exclude = ["tests*", "_data*", "_functions*", "_figures*", "examples*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "sample_data: tests that require the bundled _data/*.mat sample stacks",
+]
