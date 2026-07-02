@@ -1,11 +1,22 @@
 """Directional wavenumber-frequency spectra from slope-field stacks."""
 
+import os
 from dataclasses import dataclass, field
 
 import numpy as np
+from scipy import fft as _scipy_fft
 
 __all__ = ["compute_slope_spectrum", "azimuthal_integral", "wavenumber_grids",
            "DirectionalSpectrum"]
+
+# Threads for the 3-D FFTs (scipy pocketfft; numerically identical to numpy).
+# Default 1 preserves single-threaded behavior; set SLOPESPECTRA_FFT_WORKERS
+# to the desired thread count for large stacks.
+FFT_WORKERS = int(os.environ.get("SLOPESPECTRA_FFT_WORKERS", "1"))
+
+
+def _fftn(a, s, axes):
+    return _scipy_fft.fftn(a, s=s, axes=axes, workers=FFT_WORKERS)
 
 
 def wavenumber_grids(framesize, dx_m):
@@ -143,10 +154,10 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
     df = fs_hz / s3 if fs_hz is not None else None
 
     # Zero-padded FFT
-    Ax = np.fft.fftshift(np.fft.fftn(sx, s=(framesize, framesize, s3),
-                                     axes=(0, 1, 2)))
-    Ay = np.fft.fftshift(np.fft.fftn(sy, s=(framesize, framesize, s3),
-                                     axes=(0, 1, 2)))
+    Ax = np.fft.fftshift(_fftn(sx, s=(framesize, framesize, s3),
+                               axes=(0, 1, 2)))
+    Ay = np.fft.fftshift(_fftn(sy, s=(framesize, framesize, s3),
+                               axes=(0, 1, 2)))
 
     if s3 > 1:
         # Negative-frequency half, flipped to ascending positive-f labels
