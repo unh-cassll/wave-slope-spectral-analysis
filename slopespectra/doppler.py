@@ -11,7 +11,7 @@ import numpy as np
 import xarray as xr
 from scipy.ndimage import rotate as _rotate
 
-from .spectrum import compute_slope_spectrum
+from .spectrum import compute_slope_spectrum, wavenumber_grids
 from .windows import circular_tukey
 
 __all__ = ["upwind_downwind_wave_frequencies", "moving_window_fourier"]
@@ -45,18 +45,16 @@ def upwind_downwind_wave_frequencies(Skf, dx_m, fs_hz):
 
     f_obs = np.arange(1, nf + 1) * fs_hz / (2 * nf)
     kmin = 2 * np.pi / (s1 * dx_m)
-    kmax = np.pi / dx_m
 
-    # Wavenumber label arrays (rows = ky descending)
-    edges = np.arange(-kmax, kmax + kmin / 2, kmin)[1:]
-    kx = np.tile(edges, (s1, 1))
-    ky = np.flipud(np.tile(edges[:, None], (1, s1)))
+    # Wavenumber label arrays matching the FFT layout of Skf
+    kx, ky = wavenumber_grids(s1, dx_m)
 
     # Trim to the high-wavenumber cutoff
-    keep = np.abs(edges) < HIGH_WAVENUMBER_CUTOFF
-    kx = kx[np.ix_(keep, keep)]
-    ky = ky[np.ix_(keep, keep)]
-    S = Skf[np.ix_(keep, keep, np.arange(nf))]
+    keep_row = np.abs(ky[:, 0]) < HIGH_WAVENUMBER_CUTOFF
+    keep_col = np.abs(kx[0, :]) < HIGH_WAVENUMBER_CUTOFF
+    kx = kx[np.ix_(keep_row, keep_col)]
+    ky = ky[np.ix_(keep_row, keep_col)]
+    S = Skf[np.ix_(keep_row, keep_col, np.arange(nf))]
     k = np.sqrt(kx**2 + ky**2)
 
     fmat = np.broadcast_to(f_obs[None, None, :], S.shape)
@@ -71,7 +69,7 @@ def upwind_downwind_wave_frequencies(Skf, dx_m, fs_hz):
     mask3[fmat > MAX_FREQUENCY] = np.nan
 
     angle_down = np.rad2deg(np.arctan2(kx, ky))
-    angle_up = np.flipud(angle_down)
+    angle_up = np.rad2deg(np.arctan2(kx, -ky))
     bad_sector = (np.abs(angle_down) > HALF_SECTOR_DEG) \
         & (np.abs(angle_up) > HALF_SECTOR_DEG)
     mask3[np.repeat(bad_sector[:, :, None], nf, axis=2)] = np.nan
@@ -84,9 +82,9 @@ def upwind_downwind_wave_frequencies(Skf, dx_m, fs_hz):
     S_down[rows_up, :, :] = np.nan
     S_up[rows_down, :, :] = np.nan
 
-    k_vec = edges[edges > 0]
+    k_vec = kmin * np.arange(1, s1 // 2 + 1)
     kL = len(k_vec)
-    r = np.floor(k / np.nanmax(k_vec) * kL).astype(int)
+    r = np.round(k / kmin).astype(int)
 
     out = {name: np.full(kL, np.nan)
            for name in ("f_down", "f_up", "dir_down", "dir_up",

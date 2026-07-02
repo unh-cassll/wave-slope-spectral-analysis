@@ -51,6 +51,9 @@ class SlopeStack:
         s1, s2, _ = self.sx.shape
         if n is None:
             n = 2 ** int(np.floor(np.log2(min(s1, s2))))
+        if n > min(s1, s2):
+            raise ValueError(f"crop size {n} exceeds the spatial extent "
+                             f"({s1}, {s2})")
         n2 = n // 2
         rows = slice(s1 // 2 - n2, s1 // 2 + n - n2)
         cols = slice(s2 // 2 - n2, s2 // 2 + n - n2)

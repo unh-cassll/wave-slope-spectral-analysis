@@ -26,8 +26,8 @@ def compute_wave_spectra(source, sy=None, *, dx_m=None, fs_hz=None,
     Args:
         source, sy   : any source accepted by load_slope_stack
         dx_m, fs_hz, heading_deg, time_axis : metadata overrides
-        framesize    : square FFT size; default largest power of two
-                       fitting the spatial extent
+        framesize    : square center-crop / FFT size, at most the spatial
+                       extent; default largest power of two fitting it
         taper_width  : circular Tukey taper fraction
         temporal_alpha : Tukey cosine fraction along t (0 disables)
         window_normalization : 'power' (unbiased variance; default),

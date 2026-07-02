@@ -18,11 +18,8 @@ kmax = num_bins*kmin;
 kmat_xy = sqrt(kx.^2 + ky.^2);
 k_vec = linspace(kmin,kmax,num_bins)';
 
-% Preallocate direction array
-theta_mat_xy = atan2(kx,ky);
-theta_mat_xy = (theta_mat_xy - pi)*-1;
-theta_mat_xy = flipud(theta_mat_xy);
-theta_mat_xy = pi/180*mod(theta_mat_xy*180/pi+camera_heading_deg,360);
+% Compass angle of each (kx,ky) cell, plus camera heading
+theta_mat_xy = mod(atan2(kx,ky) + camera_heading_deg*pi/180, 2*pi);
 theta_vec = (0:dtheta*180/pi:359)*pi/180;
 theta_mat = repmat(theta_vec, [num_bins, 1]);
 

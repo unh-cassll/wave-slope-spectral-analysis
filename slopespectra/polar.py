@@ -33,8 +33,8 @@ class PolarBinner:
         self.k_vec = np.linspace(self.kmin, kmax, self.num_bins)
 
         # Compass angle of each (kx, ky) cell, plus camera heading
-        theta_mat = np.flipud(-(np.arctan2(kx, ky) - np.pi))
-        theta_mat = np.deg2rad(np.mod(np.rad2deg(theta_mat) + heading_deg, 360.0))
+        theta_mat = np.mod(np.arctan2(kx, ky) + np.deg2rad(heading_deg),
+                           2 * np.pi)
 
         dtheta_deg = np.rad2deg(self.dtheta)
         self.theta_vec = np.deg2rad(np.arange(0.0, 360.0, dtheta_deg))

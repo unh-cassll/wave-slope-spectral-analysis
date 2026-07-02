@@ -21,22 +21,20 @@ f_obs(1:s3+1) = [];
 fmat = repmat(f_obs,[1 s1 s1]);
 fmat = permute(fmat,[2 3 1]);
 
-% Create wavenumber arrays
+% Create wavenumber arrays matching the FFT layout of the input spectrum
 kmin = 2*pi/(s1*scale);
-kmax = pi/scale;
-[kx,ky] = meshgrid(-kmax:kmin:kmax,-kmax:kmin:kmax);
-kx(:,1) = [];
-ky(:,1) = [];
-kx(end,:) = [];
-ky(end,:) = [];
-ky = flipud(ky);
+Kx = kmin * (-ceil((s1-1)/2): floor((s1-1)/2));
+Ky = kmin * (ceil((s1-1)/2):-1: -floor((s1-1)/2));
+kx = repmat(Kx, [s1,1]);
+ky = repmat(Ky', [1, s1]);
+k_vec = kmin*(1:floor(s1/2));
 
 % Trim wavenumber and frequency arrays to cutoff value
-kslice = kx(1,:);
-inds_trim = abs(kslice) < high_wavenumber_cutoff;
-kx = kx(inds_trim,inds_trim);
-ky = ky(inds_trim,inds_trim);
-fmat = fmat(inds_trim,inds_trim,:);
+inds_row = abs(ky(:,1)) < high_wavenumber_cutoff;
+inds_col = abs(kx(1,:)) < high_wavenumber_cutoff;
+kx = kx(inds_row,inds_col);
+ky = ky(inds_row,inds_col);
+fmat = fmat(inds_row,inds_col,:);
 k = sqrt(kx.^2+ky.^2);
 kmat = repmat(k,[1 1 s3]);
 Cp_mat = 2*pi*fmat./kmat;
@@ -57,16 +55,12 @@ mask_block(Cp_mat>5 & fmat>1) = NaN;
 mask_block(fmat>10) = NaN;
 
 % Compute angle arrays from Cartesian wavenumber arrays
-angle_mat = 180/pi*atan2(kx,ky);
-angle_mat_down = repmat(angle_mat,[1 1 s3]);
-angle_mat = flipud(angle_mat);
-angle_mat_up = repmat(angle_mat,[1 1 s3]);
+angle_mat_down = repmat(180/pi*atan2(kx,ky),[1 1 s3]);
+angle_mat_up = repmat(180/pi*atan2(kx,-ky),[1 1 s3]);
 
 mask_block(abs(angle_mat_down)>45 & abs(angle_mat_up)>45) = NaN;
 
 % Pre-allocate vectors
-k_vec = kx(1,:);
-k_vec = k_vec(k_vec>0);
 kL = length(k_vec);
 f_down_vec = NaN*k_vec;
 f_up_vec = f_down_vec;
@@ -78,14 +72,13 @@ S_up_vec = f_down_vec;
 % Prepare spectrum for analysis
 %S_filt_masked = mask_block.*medfilt3(log10(kmat.^2.*kw_spect(inds_trim,inds_trim,:)),[k_filtnum k_filtnum f_filtnum]);
 %S_filt_masked = mask_block.*log10(kmat.^0.*kw_spect(inds_trim,inds_trim,:));
-S_filt_masked = mask_block.*kmat.^0.*kw_spect(inds_trim,inds_trim,:);
+S_filt_masked = mask_block.*kmat.^0.*kw_spect(inds_row,inds_col,:);
 S_downwind = S_filt_masked;
 S_upwind = S_filt_masked;
 S_downwind(inds_upwind,:,:) = NaN;
 S_upwind(inds_downwind,:,:) = NaN;
 
-r = k/nanmax(k_vec);
-r = floor(r*kL);
+r = round(k/kmin);
 rblock = repmat(r,[1 1 s3]);
 
 for i = 1:kL

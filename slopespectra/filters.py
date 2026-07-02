@@ -11,10 +11,14 @@ GRAV = 9.81  # m/s^2
 def filter_dispersive_bandstop(stack, dx_m, dt_s, ux=0.0, uy=0.0,
                                halfwidth_hz=0.1):
     """Remove energy along the (Doppler-shifted) gravity wave dispersion
-    shell from an image stack; total energy is rescaled to compensate.
+    shell from an image stack; the retained coefficients are rescaled so a
+    spectrally flat field keeps its total energy.
+
+    Both conjugate branches of the shell are stopped, so the filtered
+    stack is real-valued by construction.
 
     Args:
-        stack        : (ny, nx, nt) image stack
+        stack        : (ny, nx, nt) image stack, rows with the +y edge first
         dx_m         : pixel size [m]
         dt_s         : frame interval [s]
         ux, uy       : advection components Doppler-shifting the shell [m/s]
@@ -26,29 +30,27 @@ def filter_dispersive_bandstop(stack, dx_m, dt_s, ux=0.0, uy=0.0,
     stack = np.asarray(stack, dtype=float)
     ny, nx, nt = stack.shape
 
-    fmax = 1.0 / dt_s
-    f = np.arange(-0.5, 0.5 + 1 / (2 * nt), 1 / nt) * fmax
-    f = np.delete(f, nt // 2)
-    df = np.median(np.diff(f))
-    kmin_x = 2 * np.pi / (nx * dx_m)
-    kmin_y = 2 * np.pi / (ny * dx_m)
-    kmax = np.pi / dx_m
-    kx = np.arange(-kmax, kmax + kmin_x / 2, kmin_x)[1:]
-    ky = np.arange(-kmax, kmax + kmin_y / 2, kmin_y)[1:]
+    # Label arrays matching the fftshifted FFT layout (ky descending)
+    kx = 2 * np.pi * np.fft.fftshift(np.fft.fftfreq(nx, dx_m))
+    ky = -2 * np.pi * np.fft.fftshift(np.fft.fftfreq(ny, dx_m))
+    f = np.fft.fftshift(np.fft.fftfreq(nt, dt_s))
+    df = 1.0 / (nt * dt_s)
 
     Kx, Ky, F = np.meshgrid(kx, ky, f)
     K = np.sqrt(Kx**2 + Ky**2)
 
     Mf = np.fft.fftshift(np.fft.fftn(stack, s=(ny, nx, nt), axes=(0, 1, 2)))
 
-    # Dispersive bandstop mask about the Doppler-shifted shell
-    f_shell = np.sqrt(GRAV * K) / (2 * np.pi) - (ux * Kx + uy * Ky)
+    # Stop both branches of the Doppler-shifted dispersion shell
+    f_intr = np.sqrt(GRAV * K) / (2 * np.pi)
+    f_dopp = (ux * Kx + uy * Ky) / (2 * np.pi)
+    band = halfwidth_hz + df / 2
     mask = np.ones_like(stack)
-    mask[(F > f_shell - halfwidth_hz - df / 2)
-         & (F < f_shell + halfwidth_hz + df / 2)] = 0.0
+    mask[np.abs(F - (f_intr - f_dopp)) < band] = 0.0
+    mask[np.abs(F + (f_intr + f_dopp)) < band] = 0.0
 
-    # Rescale so total energy is preserved
-    coeff = stack.size / np.nansum(mask)
+    # Rescale retained coefficients: preserves a flat spectrum's energy
+    coeff = np.sqrt(stack.size / mask.sum())
 
     return np.real(np.fft.ifftn(np.fft.ifftshift(coeff * mask * Mf)))
 

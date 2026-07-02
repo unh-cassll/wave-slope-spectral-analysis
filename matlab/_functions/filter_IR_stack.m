@@ -8,18 +8,13 @@ g = 9.81; %m/s^2
 % Measure input image stack dimensions
 [Ny,Nx,Nt] = size(raw_stack);
 
-% Produce frequency and wavenumber vectors
-fmax = 1/dt;
-f = (-1/2:1/Nt:1/2)*fmax;
-df = median(diff(f));
-f(Nt/2+1) = [];
+% Produce frequency and wavenumber vectors matching the fftshift layout
+df = 1/(Nt*dt);
+f = df*(-ceil((Nt-1)/2):floor((Nt-1)/2));
 kmin_x = 2*pi/(Nx*dx);
 kmin_y = 2*pi/(Ny*dx);
-kmax = pi/dx;
-kx = -kmax:kmin_x:kmax;
-ky = -kmax:kmin_y:kmax;
-kx(1) = [];
-ky(1) = [];
+kx = kmin_x*(-ceil((Nx-1)/2):floor((Nx-1)/2));
+ky = kmin_y*(ceil((Ny-1)/2):-1:-floor((Ny-1)/2));
 
 % Produce frequency and wavenumber 3D arrays
 [Kx,Ky,F] = meshgrid(kx,ky,f);
@@ -30,21 +25,23 @@ maskblock = 0*raw_stack + 1;
 % Compute 3D FFT of input image stack
 Mf = fftshift(fftn(raw_stack,[Ny Nx Nt]));
 
-% Define wave dispersive bandstop mask
-f_low = (1/(2*pi))*sqrt(g*K)-(param1*Kx+param2*Ky) - 0.1;
-f_high = (1/(2*pi))*sqrt(g*K)-(param1*Kx+param2*Ky) + 0.1;
-maskblock(F>f_low-df/2 & F<f_high+df/2) = 0;
+% Stop both branches of the Doppler-shifted dispersion shell
+f_intr = sqrt(g*K)/(2*pi);
+f_dopp = (param1*Kx+param2*Ky)/(2*pi);
+band = 0.1 + df/2;
+maskblock(abs(F-(f_intr-f_dopp))<band) = 0;
+maskblock(abs(F+(f_intr+f_dopp))<band) = 0;
 
 % Create the lowpass filter
 %Kmax = max(K(:,1,1));
 %Kcut = Kmax/10;
 %maskblock(K>Kcut) = 0;
 
-% Ensure that energy remains the same post-filtration
-coeff_scale = squeeze(Nx*Ny*Nt/nansum(nansum(nansum(maskblock))));
+% Rescale retained coefficients: preserves a flat spectrum's energy
+coeff_scale = sqrt(Nx*Ny*Nt/sum(maskblock,'all'));
 
 % Export the filtered image stack
-filt_stack = real(ifftn(fftshift(coeff_scale*maskblock.*Mf)));
+filt_stack = real(ifftn(ifftshift(coeff_scale*maskblock.*Mf)));
 
 % Old way
 %

@@ -67,12 +67,29 @@ def test_dispersion_shell_frequency(subspectra):
     assert abs(np.nanmedian(f_shell) - f_lin) < 3 * spec.df
 
 
-def test_inverse_phase_speed_spectrum(subspectra):
-    ds, spec, _ = subspectra
+# Opposing directionally-spread wave groups at a common wavenumber: the
+# phase-speed-difference cutoff requires energy on both sides of the k plane
+OPPOSED_COMPONENTS = [(75.0, 0.04, 0.2), (90.0, 0.05, 1.1),
+                      (105.0, 0.04, 2.3), (255.0, 0.03, 3.1),
+                      (270.0, 0.035, 4.2), (285.0, 0.03, 5.3)]
+
+
+def test_inverse_phase_speed_spectrum():
+    from conftest import synthetic_wave_stack
+    sx = sy = None
+    for az, amp, ph in OPPOSED_COMPONENTS:
+        sx_i, sy_i, meta = synthetic_wave_stack(n_bin=N_BIN_DOM,
+                                                direction_deg=az,
+                                                amplitude=amp, phase=ph)
+        sx = sx_i if sx is None else sx + sx_i
+        sy = sy_i if sy is None else sy + sy_i
+    spec = compute_slope_spectrum(sx, sy, meta["dx"], meta["fs"])
+    ds = compute_sub_spectra(spec.Skf, spec.dk, spec.df)
     # Dominant wave: c = 2*pi*f0/k0 -> nu = 1/c
     k0 = N_BIN_DOM * spec.dk
     f0 = np.sqrt(9.81 * k0) / (2 * np.pi)
     nu0 = k0 / (2 * np.pi * f0)
+    assert ds.attrs["k_cutoff"] >= k0
     Qs = ds["Qs"].values
     nu_pk = float(ds["nu"][int(np.nanargmax(Qs))])
     assert abs(nu_pk - nu0) < 0.1
