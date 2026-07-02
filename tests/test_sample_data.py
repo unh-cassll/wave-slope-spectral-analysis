@@ -59,7 +59,7 @@ def test_sample_spectra_calculations(sample_stacks):
 
     # Short gravity waves dominate: spectral peak below 5 Hz and within
     # the resolved wavenumber band
-    f_pk = float(ds["f"][int(ds["S_f"].argmax())])
+    f_pk = float(ds["f"][int(np.argmax(ds["S_f"].values))])
     assert 0.1 < f_pk < 5.0
     assert ds.attrs["k_cutoff"] > float(ds["k"].min())
 

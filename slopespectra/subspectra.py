@@ -122,7 +122,7 @@ def compute_sub_spectra(Skf, dk, df, heading_deg=0.0, dtheta=np.deg2rad(5.0),
     # Convert the shell to (k, theta) space
     f_k_theta = np.full((len(k), len(theta)), np.nan)
     Smax_k_theta = np.full((len(k), len(theta)), np.nan)
-    f_keep = f <= F_HIGH_HZ
+    f_keep = f < F_HIGH_HZ
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         for i in range(1, len(k)):
@@ -254,7 +254,7 @@ def compute_sub_spectra(Skf, dk, df, heading_deg=0.0, dtheta=np.deg2rad(5.0),
             "B_f": (("f",), B_f, {"units": "m^-2 / Hz"}),
             "B_f_theta": (("theta", "f"), B_f_theta, {"units": "m^-2 / Hz / rad"}),
             # inverse phase speed spectra
-            "Qs": (("nu",), Qs, {"units": "s m-1"}),
+            "Qs": (("nu",), Qs, {"units": "m s-1"}),
             "Qs_nu_theta": (("nu", "theta"), Qs_nu_theta.T,
                             {"units": "m^2 s^-2 / rad"}),
             "Qeta": (("nu",), Qeta, {"units": "m^3 s-1"}),

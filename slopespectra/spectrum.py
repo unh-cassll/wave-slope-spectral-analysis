@@ -107,7 +107,10 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
     Returns:
         DirectionalSpectrum. For nt > 1, Skf holds the spectral density on
         positive frequencies f = df * (1..nt/2) and Skxky its integral
-        over f; for a single frame only Skxky is computed.
+        over f; for a single frame only Skxky is computed. The f = 0 plane
+        is excluded, so static (per-pixel temporal mean) variance is
+        absent; remove the temporal mean beforehand for exact variance
+        accounting.
     """
     sx = np.asarray(sx, dtype=float)
     sy = np.asarray(sy, dtype=float)
@@ -155,6 +158,9 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
         C = 2.0 / (N**2 * dk * dk * df)
         A = (Ax * np.conj(Ax) + Ay * np.conj(Ay)).real
         Skf = mask[:, :, None] * A * C
+        # Temporal Nyquist plane has no conjugate partner: undo the
+        # one-sided doubling there
+        Skf[:, :, -1] *= 0.5
         Skxky = np.nansum(Skf, axis=2) * df
         Skxky[np.isnan(mask)] = np.nan
     else:

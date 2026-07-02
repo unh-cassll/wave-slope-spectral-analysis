@@ -186,7 +186,7 @@ for theta_num = 1:length(theta)
 end
 
 % Integrate with respect to direction
-Qs = sum(nu.*Qs_nu_theta)*dtheta;       % s/m
+Qs = sum(nu.*Qs_nu_theta)*dtheta;       % m/s
 Qeta = sum(nu.*Qeta_nu_theta)*dtheta;   % m^3/s
 Qb = sum(nu.*Qb_nu_theta)*dtheta;       % 1/(s*m)
 

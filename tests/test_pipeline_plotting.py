@@ -25,7 +25,7 @@ def test_pipeline_crops_and_runs(pipeline_result):
     assert ds.attrs["framesize"] == 64
     assert ds.attrs["mss"] > 0
     # Windowed spectrum still localizes the input wave
-    k_pk = float(ds["k"][int(ds["S_k"].argmax())])
+    k_pk = float(ds["k"][int(np.argmax(ds["S_k"].values))])
     assert np.isclose(k_pk, meta["k0"], atol=2 * ds.attrs["dk"])
 
 

@@ -152,6 +152,8 @@ def moving_window_fourier(sx, sy, dx_m, fs_hz, window_length_s, window_step_s,
 
     frames_per_bit = int(fs_hz * window_length_s)
     frames_per_bit -= frames_per_bit % 2
+    if frames_per_bit < 2:
+        raise ValueError("window_length_s spans fewer than two frames")
     frames_per_shift = max(int(np.floor(fs_hz * window_step_s)), 1)
     starts = np.arange(0, s3 - frames_per_bit + 1, frames_per_shift)
 

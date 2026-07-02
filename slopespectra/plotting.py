@@ -118,7 +118,7 @@ def plot_sub_spectra(ds, fig=None):
     ax.set_title("(d) directional frequency spectrum")
 
     ax = axs[2, 0]
-    ax.loglog(nu, ds["Qs"], label=r"$Q_s(\nu)$ [s m$^{-1}$]")
+    ax.loglog(nu, ds["Qs"], label=r"$Q_s(\nu)$ [m s$^{-1}$]")
     ax.loglog(nu, ds["Qeta"], label=r"$Q_\eta(\nu)$ [m$^3$ s$^{-1}$]")
     ax.set_xlabel(r"$\nu$ [s m$^{-1}$]")
     ax.set_ylabel("spectral density")

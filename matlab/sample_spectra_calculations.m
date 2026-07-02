@@ -64,7 +64,7 @@ F_f = spectra_struc.F_f;
 f_disp = sqrt(9.81*k)/(2*pi);
 c = 2*pi*f_disp./k;
 cg = c/2;
-F_f_disp = F_k.*k./cg/(2*pi);
+F_f_disp = F_k*2*pi./cg; % F(f) = F(k)*dk/df, dk/df = 2*pi/cg
 figure(101);loglog(f,F_f,'-',f_disp,F_f_disp,'-','linewidth',2)
 
 

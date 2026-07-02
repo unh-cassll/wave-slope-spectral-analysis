@@ -27,17 +27,17 @@ def test_total_variance_matches_field(subspectra):
 def test_directional_peak(subspectra):
     ds, _, _ = subspectra
     D = (ds["S_k_theta"] * ds["k"]).sum("k")
-    az = np.rad2deg(float(ds["theta"][int(D.argmax())]))
+    az = np.rad2deg(float(ds["theta"][int(np.argmax(D.values))]))
     # Energy-weighted construction is centered near 90 deg (east)
     assert abs((az - 90 + 180) % 360 - 180) <= 15
 
 
 def test_omni_peaks(subspectra):
     ds, spec, (_, _, meta) = subspectra
-    k_pk = float(ds["k"][int(ds["S_k"].argmax())])
+    k_pk = float(ds["k"][int(np.argmax(ds["S_k"].values))])
     # Dominant component is the 8th bin
     assert np.isclose(k_pk, N_BIN_DOM * spec.dk, atol=2 * spec.dk)
-    f_pk = float(ds["f"][int(ds["S_f"].argmax())])
+    f_pk = float(ds["f"][int(np.argmax(ds["S_f"].values))])
     f0_dom = np.sqrt(9.81 * N_BIN_DOM * spec.dk) / (2 * np.pi)
     assert np.isclose(f_pk, f0_dom, atol=2 * spec.df)
 
