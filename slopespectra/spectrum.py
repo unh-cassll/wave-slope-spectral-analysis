@@ -6,8 +6,8 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy import fft as _scipy_fft
 
-__all__ = ["compute_slope_spectrum", "azimuthal_integral", "wavenumber_grids",
-           "DirectionalSpectrum"]
+__all__ = ["compute_slope_spectrum", "compute_segment_power", "finish_spectrum",
+           "azimuthal_integral", "wavenumber_grids", "DirectionalSpectrum"]
 
 # Threads for the 3-D FFTs (scipy pocketfft; numerically identical to numpy).
 # Default 1 preserves single-threaded behavior; set SLOPESPECTRA_FFT_WORKERS
@@ -104,8 +104,17 @@ class DirectionalSpectrum:
     attrs: dict = field(default_factory=dict)
 
 
-def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
-    """Directional wavenumber(-frequency) spectrum of slope-field stacks.
+def compute_segment_power(sx, sy, dx_m, fs_hz=None, framesize=None,
+                          dtype=np.float64):
+    """Unshifted directional wavenumber(-frequency) power of one slope-field
+    segment, before the Nyquist-circle mask, physical normalization, and
+    spatial fftshift.
+
+    To average many segments (e.g. successive records from a long time
+    series): sum or average the returned `power` across segments, then call
+    `finish_spectrum` once on the result. The mask, normalization, and
+    spatial shift are independent of the data, so applying them after
+    averaging is exact and cheaper than once per segment.
 
     Args:
         sx, sy    : (ny, nx) or (ny, nx, nt) slope-field stacks; the time
@@ -114,17 +123,19 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
         fs_hz     : frame rate [Hz]; required when nt > 1
         framesize : FFT size in the spatial dimensions (fields are
                     zero-padded up to this size); defaults to ny
+        dtype     : real dtype for the FFT input (default float64); a
+                    32-bit dtype roughly halves memory bandwidth for the
+                    dominant FFT stage at ~1e-7 relative precision cost
 
     Returns:
-        DirectionalSpectrum. For nt > 1, Skf holds the spectral density on
-        positive frequencies f = df * (1..nt/2) and Skxky its integral
-        over f; for a single frame only Skxky is computed. The f = 0 plane
-        is excluded, so static (per-pixel temporal mean) variance is
-        absent; remove the temporal mean beforehand for exact variance
-        accounting.
+        (power, framesize, s3): power has shape (framesize, framesize,
+        s3//2) holding ascending positive frequencies f = df*(1..s3//2), in
+        the unshifted spatial-frequency layout (index 0 = DC on axes 0-1);
+        for a single frame, shape (framesize, framesize). s3 is the frame
+        count, needed by `finish_spectrum` to recover df.
     """
-    sx = np.asarray(sx, dtype=float)
-    sy = np.asarray(sy, dtype=float)
+    sx = np.asarray(sx, dtype=dtype)
+    sy = np.asarray(sy, dtype=dtype)
     if sx.shape != sy.shape:
         raise ValueError("sx and sy must have the same shape")
     if sx.ndim == 2:
@@ -141,34 +152,51 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
         if s3 % 2:
             raise ValueError("the time dimension must be of even length")
 
+    Ax = _fftn(sx, s=(framesize, framesize, s3), axes=(0, 1, 2))
+    Ay = _fftn(sy, s=(framesize, framesize, s3), axes=(0, 1, 2))
+
+    if s3 > 1:
+        # Natural FFT order stores negative frequencies in the back half of
+        # axis 2; selecting and reversing it gives ascending positive-f
+        # labels without ever shifting the temporal axis.
+        Ax = Ax[:, :, :s3 // 2 - 1:-1]
+        Ay = Ay[:, :, :s3 // 2 - 1:-1]
+        power = (Ax * np.conj(Ax) + Ay * np.conj(Ay)).real
+    else:
+        power = (Ax[:, :, 0] * np.conj(Ax[:, :, 0])
+                + Ay[:, :, 0] * np.conj(Ay[:, :, 0])).real
+    return power, framesize, s3
+
+
+def finish_spectrum(power, framesize, dx_m, s3, fs_hz=None):
+    """Shift, mask, and normalize a (possibly segment-averaged) power cube
+    from `compute_segment_power` into a DirectionalSpectrum.
+
+    Args:
+        power     : power cube from `compute_segment_power` (or the mean of
+                    several such cubes sharing the same framesize/s3)
+        framesize, dx_m, s3, fs_hz : as passed to `compute_segment_power`
+
+    Returns:
+        DirectionalSpectrum, as `compute_slope_spectrum`.
+    """
     kmin = 2 * np.pi / (framesize * dx_m)
     kmax = np.pi / dx_m
     kx, ky = wavenumber_grids(framesize, dx_m)
 
-    # Mask beyond the Nyquist circle
     k = np.sqrt(kx**2 + ky**2)
     mask = np.ones_like(k)
     mask[k > kmax] = np.nan
 
     dk = kmin
     df = fs_hz / s3 if fs_hz is not None else None
-
-    # Zero-padded FFT
-    Ax = np.fft.fftshift(_fftn(sx, s=(framesize, framesize, s3),
-                               axes=(0, 1, 2)))
-    Ay = np.fft.fftshift(_fftn(sy, s=(framesize, framesize, s3),
-                               axes=(0, 1, 2)))
+    power = np.fft.fftshift(np.asarray(power, dtype=float), axes=(0, 1))
 
     if s3 > 1:
-        # Negative-frequency half, flipped to ascending positive-f labels
-        Ax = Ax[:, :, :s3 // 2][:, :, ::-1]
-        Ay = Ay[:, :, :s3 // 2][:, :, ::-1]
         f = df * np.arange(1, s3 // 2 + 1)
-
         N = framesize * framesize * s3
         C = 2.0 / (N**2 * dk * dk * df)
-        A = (Ax * np.conj(Ax) + Ay * np.conj(Ay)).real
-        Skf = mask[:, :, None] * A * C
+        Skf = mask[:, :, None] * power * C
         # Temporal Nyquist plane has no conjugate partner: undo the
         # one-sided doubling there
         Skf[:, :, -1] *= 0.5
@@ -177,11 +205,9 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
     else:
         f = None
         Skf = None
-        N = s1 * s2
+        N = framesize * framesize
         C = 1.0 / (N**2 * dk * dk)
-        A = (Ax[:, :, 0] * np.conj(Ax[:, :, 0])
-             + Ay[:, :, 0] * np.conj(Ay[:, :, 0])).real
-        Skxky = mask * A * C
+        Skxky = mask * power * C
 
     omni_k, omni_S = azimuthal_integral(Skxky, dx_m)
 
@@ -190,3 +216,29 @@ def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None):
         f=f, df=df, Skf=Skf,
         attrs={"dx_m": dx_m, "fs_hz": fs_hz, "framesize": framesize},
     )
+
+
+def compute_slope_spectrum(sx, sy, dx_m, fs_hz=None, framesize=None,
+                           dtype=np.float64):
+    """Directional wavenumber(-frequency) spectrum of slope-field stacks.
+
+    Args:
+        sx, sy    : (ny, nx) or (ny, nx, nt) slope-field stacks; the time
+                    dimension, if present, must be of even length
+        dx_m      : pixel size [m]
+        fs_hz     : frame rate [Hz]; required when nt > 1
+        framesize : FFT size in the spatial dimensions (fields are
+                    zero-padded up to this size); defaults to ny
+        dtype     : real dtype for the FFT input (default float64)
+
+    Returns:
+        DirectionalSpectrum. For nt > 1, Skf holds the spectral density on
+        positive frequencies f = df * (1..nt/2) and Skxky its integral
+        over f; for a single frame only Skxky is computed. The f = 0 plane
+        is excluded, so static (per-pixel temporal mean) variance is
+        absent; remove the temporal mean beforehand for exact variance
+        accounting.
+    """
+    power, framesize, s3 = compute_segment_power(sx, sy, dx_m, fs_hz,
+                                                 framesize, dtype)
+    return finish_spectrum(power, framesize, dx_m, s3, fs_hz)

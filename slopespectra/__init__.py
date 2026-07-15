@@ -13,7 +13,8 @@ Typical use:
 
 from .io import SlopeStack, load_slope_stack
 from .windows import circular_tukey, blackman_harris, taper_2d
-from .spectrum import (compute_slope_spectrum, azimuthal_integral,
+from .spectrum import (compute_slope_spectrum, compute_segment_power,
+                       finish_spectrum, azimuthal_integral,
                        wavenumber_grids, DirectionalSpectrum)
 from .polar import polar_from_cartesian, PolarBinner
 from .subspectra import compute_sub_spectra
@@ -30,7 +31,8 @@ __version__ = "0.1.0"
 __all__ = [
     "SlopeStack", "load_slope_stack",
     "circular_tukey", "blackman_harris", "taper_2d",
-    "compute_slope_spectrum", "azimuthal_integral", "wavenumber_grids",
+    "compute_slope_spectrum", "compute_segment_power", "finish_spectrum",
+    "azimuthal_integral", "wavenumber_grids",
     "DirectionalSpectrum",
     "polar_from_cartesian", "PolarBinner",
     "compute_sub_spectra", "compute_wave_spectra",

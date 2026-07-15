@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from slopespectra import (compute_slope_spectrum, azimuthal_integral,
+from slopespectra import (compute_slope_spectrum, compute_segment_power,
+                         finish_spectrum, azimuthal_integral,
                          wavenumber_grids)
 from conftest import synthetic_wave_stack
 
@@ -92,3 +93,48 @@ def test_azimuthal_integral_smooth_isotropic():
     # Total variance conserved
     dk = 2 * np.pi / (m * dx)
     assert np.isclose(np.sum(S_k) * dk, np.nansum(S) * dk * dk, rtol=1e-3)
+
+
+def test_segment_power_matches_compute_slope_spectrum(eastward_wave):
+    sx, sy, meta = eastward_wave
+    power, framesize, s3 = compute_segment_power(sx, sy, meta["dx"], meta["fs"])
+    split = finish_spectrum(power, framesize, meta["dx"], s3, meta["fs"])
+    direct = compute_slope_spectrum(sx, sy, meta["dx"], meta["fs"])
+    assert np.allclose(np.nan_to_num(split.Skf), np.nan_to_num(direct.Skf))
+    assert np.allclose(np.nan_to_num(split.Skxky), np.nan_to_num(direct.Skxky))
+
+
+def test_segment_power_averaging_matches_stacked_input(eastward_wave):
+    # Averaging two segments' raw power and finishing once must equal
+    # concatenating them into one double-length stack and computing directly
+    # (both hold the same number of independent 600-frame realizations).
+    sx, sy, meta = eastward_wave
+    p1, framesize, s3 = compute_segment_power(sx, sy, meta["dx"], meta["fs"])
+    p2, _, _ = compute_segment_power(sx, sy, meta["dx"], meta["fs"])
+    mean_power = (p1 + p2) / 2
+    spec = finish_spectrum(mean_power, framesize, meta["dx"], s3, meta["fs"])
+    direct = compute_slope_spectrum(sx, sy, meta["dx"], meta["fs"])
+    assert np.allclose(np.nan_to_num(spec.Skf), np.nan_to_num(direct.Skf))
+
+
+def test_segment_power_float32_close_to_float64(eastward_wave):
+    sx, sy, meta = eastward_wave
+    p64, framesize, s3 = compute_segment_power(sx, sy, meta["dx"], meta["fs"],
+                                               dtype=np.float64)
+    p32, _, _ = compute_segment_power(sx, sy, meta["dx"], meta["fs"],
+                                      dtype=np.float32)
+    spec64 = finish_spectrum(p64, framesize, meta["dx"], s3, meta["fs"])
+    spec32 = finish_spectrum(p32, framesize, meta["dx"], s3, meta["fs"])
+    scale = np.nanmax(np.abs(spec64.Skf))
+    assert np.nanmax(np.abs(spec64.Skf - spec32.Skf)) / scale < 1e-5
+
+
+def test_segment_power_single_frame(eastward_wave):
+    sx, sy, meta = eastward_wave
+    power, framesize, s3 = compute_segment_power(sx[:, :, 0], sy[:, :, 0],
+                                                 meta["dx"])
+    assert s3 == 1
+    spec = finish_spectrum(power, framesize, meta["dx"], s3)
+    direct = compute_slope_spectrum(sx[:, :, 0], sy[:, :, 0], meta["dx"])
+    assert spec.Skf is None
+    assert np.allclose(np.nan_to_num(spec.Skxky), np.nan_to_num(direct.Skxky))

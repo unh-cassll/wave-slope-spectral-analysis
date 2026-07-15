@@ -25,7 +25,7 @@ def _radial_tukey(s1, s2, taper_width):
 
 
 def circular_tukey(in_array, taper_width=0.2, normalization="power",
-                   temporal_alpha=0.0):
+                   temporal_alpha=0.0, dtype=None):
     """Circular Tukey (tapered cosine) window applied to a 2D or 3D array.
 
     A 3D (ny, nx, nt) array is tapered radially in (y, x), optionally also
@@ -44,11 +44,16 @@ def circular_tukey(in_array, taper_width=0.2, normalization="power",
         in_array       : (ny, nx) or (ny, nx, nt) array
         taper_width    : cosine taper fraction of the inscribed radius
         temporal_alpha : Tukey cosine fraction along t (0 disables)
+        dtype          : output/working precision (default float64); the
+                         window itself is also cast, so a real-valued dtype
+                         such as float32 halves the memory footprint of the
+                         windowed array for large stacks
 
     Returns:
-        Windowed array, same shape as input.
+        Windowed array, same shape as input, cast to dtype.
     """
-    in_array = np.asarray(in_array, dtype=float)
+    dtype = np.float64 if dtype is None else dtype
+    in_array = np.asarray(in_array, dtype=dtype)
     if in_array.ndim == 2:
         s1, s2 = in_array.shape
         s3 = 1
@@ -69,9 +74,11 @@ def circular_tukey(in_array, taper_width=0.2, normalization="power",
         raise ValueError("normalization must be 'power', 'spectral' or "
                          "'none'")
 
+    w2d = (C * w2d).astype(dtype)
+    w_t = w_t.astype(dtype)
     if in_array.ndim == 3:
-        return C * w2d[:, :, None] * w_t[None, None, :] * in_array
-    return C * w2d * in_array
+        return w2d[:, :, None] * w_t[None, None, :] * in_array
+    return w2d * in_array
 
 
 def blackman_harris(n):
